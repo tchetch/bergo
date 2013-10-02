@@ -99,3 +99,53 @@ func (bval *BerVal) Enumerated64(v int64) {
 		*bval = append(*bval, b[i])
 	}
 }
+
+func MakeBERLen(v uint64) []byte {
+	var b []byte
+
+	if v <= 127 {
+		b = append(b, byte(v))
+	} else {
+		ocount := 0
+
+		b = append(b, 0x00) // place for length
+		for i := 7; i >= 0; i-- {
+			if byte(v>>uint(i*8)) != 0x00 {
+				b = append(b, byte(v>>uint(i*8)))
+				ocount++
+			}
+		}
+
+		b[0] = 0x80 | (byte(ocount) & 0x3F)
+	}
+
+	return b
+}
+
+/* Primitive octetstring, if size is known in advance 
+ * 0 sized octetstring are allowed.
+ */
+func (bval *BerVal) OctetstringP(v []byte) {
+	var length []byte
+
+	length = MakeBERLen(uint64(len(v)))
+
+	*bval = append(*bval, Universal|Primitive|Octetstring)
+	for i := 0; i < len(length); i++ {
+		*bval = append(*bval, length[i])
+	}
+	for i := 0; i < len(v); i++ {
+		*bval = append(*bval, v[i])
+	}
+}
+
+/* If size is not known in advance, use OctetstringC then use OctetstringP to
+ * send segment as they come. A segment can be zero sized.
+ * X.609 allow to send constructed octetstring within a constructed octetstring
+ * so you may restart a constructed octetstring ... but you should prefer
+ * primitive octetstring.
+ * Finish with EOC.
+ */
+func (bval *BerVal) OctetstringC() {
+	*bval = append(*bval, Universal|Constructed|Octetstring, 0x80)
+}
