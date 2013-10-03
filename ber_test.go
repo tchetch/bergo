@@ -145,7 +145,7 @@ func TestMakeBERLen(t *testing.T) {
 	max := []byte{0x88, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF} // 18446744073709551615
 	min := []byte{0x00}
 	ord := []byte{0x88, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08} // 72623859790382856
-	x609 := []byte{0x81, 0xC9}                                          // example value in X.609 document -> 201
+	x690 := []byte{0x81, 0xC9}                                          // example value in X.690 document -> 201
 	res = MakeBERLen(18446744073709551615)
 	if len(res) != len(max) {
 		t.Fail()
@@ -174,11 +174,11 @@ func TestMakeBERLen(t *testing.T) {
 		}
 	}
 	res = MakeBERLen(201)
-	if len(res) != len(x609) {
+	if len(res) != len(x690) {
 		t.Fail()
 	}
 	for i := 0; i < len(res); i++ {
-		if res[i] != x609[i] {
+		if res[i] != x690[i] {
 			t.Fail()
 		}
 	}
