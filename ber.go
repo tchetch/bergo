@@ -2,10 +2,11 @@ package ber
 
 type BerVal []byte
 type Ber struct {
-	primitive bool
-	tag       uint64
-	class     byte
-	content   []byte
+	value       BerVal
+	constructed bool
+	tag         uint64
+	class       byte
+	content     []byte
 }
 
 /* Class bits (to be OR'd) */
@@ -42,23 +43,23 @@ func (bval *BerVal) Bool(v bool) {
 	if v {
 		b[0] = 0xFF
 	}
-	bval.Any(Universal, uint64(Bool), true, b)
+	bval.Any(Universal, uint64(Bool), false, b)
 }
 
 func (bval *BerVal) Null() {
-	bval.Any(Universal, uint64(Null), true, nil)
+	bval.Any(Universal, uint64(Null), false, nil)
 }
 
 func (bval *BerVal) EOC() {
-	bval.Any(Universal, uint64(EOC), true, nil)
+	bval.Any(Universal, uint64(EOC), false, nil)
 }
 
 func (bval *BerVal) Set() {
-	bval.Any(Universal, uint64(Set), false, nil)
+	bval.Any(Universal, uint64(Set), true, nil)
 }
 
 func (bval *BerVal) Sequence() {
-	bval.Any(Universal, uint64(Sequence), false, nil)
+	bval.Any(Universal, uint64(Sequence), true, nil)
 }
 
 /* Go store int64 as 2's complement exactly as needed for BER */
@@ -85,11 +86,11 @@ func Integer64ToBer(v int64) (b []byte) {
 }
 
 func (bval *BerVal) Integer64(v int64) {
-	bval.Any(Universal, uint64(Integer), true, Integer64ToBer(v))
+	bval.Any(Universal, uint64(Integer), false, Integer64ToBer(v))
 }
 
 func (bval *BerVal) Enumerated64(v int64) {
-	bval.Any(Universal, uint64(Enumerated), true, Integer64ToBer(v))
+	bval.Any(Universal, uint64(Enumerated), false, Integer64ToBer(v))
 }
 
 func MakeBERLen(v uint64) (b []byte) {
@@ -116,7 +117,7 @@ func MakeBERLen(v uint64) (b []byte) {
  * 0 sized octetstring are allowed.
  */
 func (bval *BerVal) OctetstringP(v []byte) {
-	bval.Any(Universal, uint64(Octetstring), true, v)
+	bval.Any(Universal, uint64(Octetstring), false, v)
 }
 
 /* If size is not known in advance, use OctetstringC then use OctetstringP to
@@ -127,7 +128,7 @@ func (bval *BerVal) OctetstringP(v []byte) {
  * Finish with EOC.
  */
 func (bval *BerVal) OctetstringC() {
-	bval.Any(Universal, uint64(Octetstring), false, nil)
+	bval.Any(Universal, uint64(Octetstring), true, nil)
 }
 
 func MakeBigTag(tag uint64) (b []byte) {
@@ -152,7 +153,7 @@ func MakeBigTag(tag uint64) (b []byte) {
 	return b
 }
 
-func (bval *BerVal) Any(class byte, tag uint64, primitive bool, val []byte) {
+func (bval *BerVal) Any(class byte, tag uint64, constructed bool, val []byte) {
 	var tmp []byte
 	if tag > 30 {
 		tmp = MakeBigTag(tag)
@@ -160,14 +161,14 @@ func (bval *BerVal) Any(class byte, tag uint64, primitive bool, val []byte) {
 		tmp = append(tmp, byte(tag)&0x1F)
 	}
 
-	if !primitive {
+	if constructed {
 		tmp[0] |= 0x20
 	}
 	tmp[0] |= byte((class & 0x03) << 6)
 
 	*bval = tmp
 
-	if len(val) > 0 && primitive {
+	if len(val) > 0 && !constructed {
 		tmp = MakeBERLen(uint64(len(val)))
 		for i := 0; i < len(val); i++ {
 			tmp = append(tmp, val[i])
@@ -179,4 +180,16 @@ func (bval *BerVal) Any(class byte, tag uint64, primitive bool, val []byte) {
 	for i := 0; i < len(tmp); i++ {
 		*bval = append(*bval, tmp[i])
 	}
+}
+
+func (ber *Ber) Constructed() {
+	ber.constructed = true
+}
+
+func (ber *Ber) PutInt64(v int64) {
+	copy(ber.content, Integer64ToBer(v))
+}
+
+func (ber *Ber) Build() {
+	ber.value.Any(ber.class, ber.tag, ber.constructed, ber.content)
 }
