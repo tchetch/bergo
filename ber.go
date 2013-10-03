@@ -2,10 +2,10 @@ package ber
 
 type BerVal []byte
 type Ber struct {
-	pc      bool
-	tag     uint
-	class   uint
-	content []byte
+	primitive bool
+	tag       uint64
+	class     byte
+	content   []byte
 }
 
 /* Class bits (to be OR'd) */
@@ -38,29 +38,27 @@ const (
 )
 
 func (bval *BerVal) Bool(v bool) {
-	var b byte
+	b := []byte{0x00}
 	if v {
-		b = 0xFF
-	} else {
-		b = 0x00
+		b[0] = 0xFF
 	}
-	*bval = append(*bval, Universal|Primitive|Bool, 0x01, b)
+	bval.Any(Universal, uint64(Bool), true, b)
 }
 
 func (bval *BerVal) Null() {
-	*bval = append(*bval, Universal|Primitive|Null, 0x00)
+	bval.Any(Universal, uint64(Null), true, nil)
 }
 
 func (bval *BerVal) EOC() {
-	*bval = append(*bval, Universal|Primitive|EOC, 0x00)
+	bval.Any(Universal, uint64(EOC), true, nil)
 }
 
 func (bval *BerVal) Set() {
-	*bval = append(*bval, Universal|Constructed|Set, 0x80)
+	bval.Any(Universal, uint64(Set), false, nil)
 }
 
 func (bval *BerVal) Sequence() {
-	*bval = append(*bval, Universal|Constructed|Sequence, 0x80)
+	bval.Any(Universal, uint64(Sequence), false, nil)
 }
 
 /* Go store int64 as 2's complement exactly as needed for BER */
@@ -87,23 +85,11 @@ func Integer64ToBer(v int64) (b []byte) {
 }
 
 func (bval *BerVal) Integer64(v int64) {
-	var b []byte
-
-	b = Integer64ToBer(v)
-	*bval = append(*bval, Universal|Primitive|Integer, byte(len(b)))
-	for i := 0; i < len(b); i++ {
-		*bval = append(*bval, b[i])
-	}
+	bval.Any(Universal, uint64(Integer), true, Integer64ToBer(v))
 }
 
 func (bval *BerVal) Enumerated64(v int64) {
-	var b []byte
-
-	b = Integer64ToBer(v)
-	*bval = append(*bval, Universal|Primitive|Enumerated, byte(len(b)))
-	for i := 0; i < len(b); i++ {
-		*bval = append(*bval, b[i])
-	}
+	bval.Any(Universal, uint64(Enumerated), true, Integer64ToBer(v))
 }
 
 func MakeBERLen(v uint64) (b []byte) {
@@ -130,17 +116,7 @@ func MakeBERLen(v uint64) (b []byte) {
  * 0 sized octetstring are allowed.
  */
 func (bval *BerVal) OctetstringP(v []byte) {
-	var length []byte
-
-	length = MakeBERLen(uint64(len(v)))
-
-	*bval = append(*bval, Universal|Primitive|Octetstring)
-	for i := 0; i < len(length); i++ {
-		*bval = append(*bval, length[i])
-	}
-	for i := 0; i < len(v); i++ {
-		*bval = append(*bval, v[i])
-	}
+	bval.Any(Universal, uint64(Octetstring), true, v)
 }
 
 /* If size is not known in advance, use OctetstringC then use OctetstringP to
@@ -151,7 +127,7 @@ func (bval *BerVal) OctetstringP(v []byte) {
  * Finish with EOC.
  */
 func (bval *BerVal) OctetstringC() {
-	*bval = append(*bval, Universal|Constructed|Octetstring, 0x80)
+	bval.Any(Universal, uint64(Octetstring), false, nil)
 }
 
 func MakeBigTag(tag uint64) (b []byte) {
@@ -162,6 +138,7 @@ func MakeBigTag(tag uint64) (b []byte) {
 	}
 
 	leading := true
+	b = append(b, 0x1F) // bit 5 to 1 set to 1
 	for i := len(tmp) - 1; i >= 0; i-- {
 		if tmp[i] != 0x00 {
 			leading = false
@@ -175,6 +152,31 @@ func MakeBigTag(tag uint64) (b []byte) {
 	return b
 }
 
-func (bval *BerVal) Any(class uint, tag uint, pc bool, val []byte) {
+func (bval *BerVal) Any(class byte, tag uint64, primitive bool, val []byte) {
+	var tmp []byte
+	if tag > 30 {
+		tmp = MakeBigTag(tag)
+	} else {
+		tmp = append(tmp, byte(tag)&0x1F)
+	}
 
+	if !primitive {
+		tmp[0] |= 0x20
+	}
+	tmp[0] |= byte((class & 0x03) << 6)
+
+	*bval = tmp
+
+	if len(val) > 0 && primitive {
+		tmp = MakeBERLen(uint64(len(val)))
+		for i := 0; i < len(val); i++ {
+			tmp = append(tmp, val[i])
+		}
+	} else {
+		tmp = append(tmp, 0x80)
+	}
+
+	for i := 0; i < len(tmp); i++ {
+		*bval = append(*bval, tmp[i])
+	}
 }
