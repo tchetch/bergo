@@ -233,3 +233,38 @@ func TestOctetstringP(t *testing.T) {
 		}
 	}
 }
+
+func TestMakeBigTag(t *testing.T) {
+	var res []byte
+	v1 := []byte{0x36}                   // 54
+	v2 := []byte{0x81, 0x1A}             // 154
+	v3 := []byte{0x81, 0xB7, 0x8D, 0x40} //3000000
+
+	res = MakeBigTag(54)
+	if len(res) != len(v1) {
+		t.Fail()
+	}
+	for i := 0; i < len(res); i++ {
+		if res[i] != v1[i] {
+			t.Fail()
+		}
+	}
+	res = MakeBigTag(154)
+	if len(res) != len(v2) {
+		t.Fail()
+	}
+	for i := 0; i < len(res); i++ {
+		if res[i] != v2[i] {
+			t.Fail()
+		}
+	}
+	res = MakeBigTag(3000000)
+	if len(res) != len(v3) {
+		t.Fail()
+	}
+	for i := 0; i < len(res); i++ {
+		if res[i] != v3[i] {
+			t.Fail()
+		}
+	}
+}

@@ -1,6 +1,12 @@
 package ber
 
 type BerVal []byte
+type Ber struct {
+	pc      bool
+	tag     uint
+	class   uint
+	content []byte
+}
 
 /* Class bits (to be OR'd) */
 const (
@@ -58,8 +64,8 @@ func (bval *BerVal) Sequence() {
 }
 
 /* Go store int64 as 2's complement exactly as needed for BER */
-func Integer64ToBer(v int64) []byte {
-	var b [8]byte
+func Integer64ToBer(v int64) (b []byte) {
+	b = make([]byte, 8)
 
 	for j := 0; j < 8; j++ {
 		b[j] = byte(v >> uint((7-j)*8))
@@ -100,9 +106,7 @@ func (bval *BerVal) Enumerated64(v int64) {
 	}
 }
 
-func MakeBERLen(v uint64) []byte {
-	var b []byte
-
+func MakeBERLen(v uint64) (b []byte) {
 	if v <= 127 {
 		b = append(b, byte(v))
 	} else {
@@ -148,4 +152,29 @@ func (bval *BerVal) OctetstringP(v []byte) {
  */
 func (bval *BerVal) OctetstringC() {
 	*bval = append(*bval, Universal|Constructed|Octetstring, 0x80)
+}
+
+func MakeBigTag(tag uint64) (b []byte) {
+	var tmp []byte
+	for tag != 0 {
+		tmp = append(tmp, (byte(tag) & 0x7F))
+		tag = tag >> 7
+	}
+
+	leading := true
+	for i := len(tmp) - 1; i >= 0; i-- {
+		if tmp[i] != 0x00 {
+			leading = false
+		}
+		if !leading {
+			b = append(b, 0x80|tmp[i])
+		}
+	}
+	b[len(b)-1] = b[len(b)-1] & 0x7F // last byte 8th bit to 0
+
+	return b
+}
+
+func (bval *BerVal) Any(class uint, tag uint, pc bool, val []byte) {
+
 }
