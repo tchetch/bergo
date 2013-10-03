@@ -1,4 +1,18 @@
 BERGO
 =====
 
-Implement BER in Go.
+BER encoding and decoding library (ISO/IEC 8825-1, ITU-T X.690) in Go.
+
+Introduction
+------------
+
+Basic Encoding Rule (BER) is generally associated to ASN.1 but can be, and
+is, used elsewhere (like EMV standard for credit and debit card). This project
+aims to support BER encoding and decoding as specified by X.690 (including the
+many variation for real value). 
+
+Similar projets
+---------------
+
+  * https://github.com/jbuchbinder/go-asn1-ber
+  * https://github.com/mmitton/asn1-ber
